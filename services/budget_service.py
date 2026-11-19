@@ -3,71 +3,83 @@ def set_budget(connection, account_id: int, category_id: int, monthly_limit: flo
     Creates or updates a budget for an account and category
     for a specific month and year.
     Returns the budget object
+
+    Should return:
+    b.*
+    account name
+    category name
     """
 
     cursor = connection.cursor()
 
     try:
-        cursor.execute("""
-        UPDATE tracker.Budgets
-        SET monthly_limit = ?
-        OUTPUT INSERTED.budget_id
-        WHERE account_id = ?
-            AND category_id = ?
-            AND budget_month = ?
-            AND budget_year = ?
-        """, (monthly_limit, account_id, category_id, month, year))
+        cursor.execute(
+            """
+            SELECT budget_id
+            FROM tracker.Budgets
+            WHERE account_id = ? 
+                AND category_id = ? 
+                AND budget_month = ? 
+                AND budget_year = ?
+            """,
+            (account_id, category_id, month, year)
+        )
 
-        row = cursor.fetchone()
+        existing_budget = cursor.fetchone()
 
-        if row is None:
-            cursor.execute("""
-            INSERT INTO tracker.Budgets (
-                account_id,
-                category_id,
-                monthly_limit,
-                budget_month,
-                budget_year
+        if existing_budget is not None:
+            cursor.execute(
+                """
+                UPDATE tracker.Budgets
+                SET monthly_limit = ?
+                WHERE budget_id = ?
+                """,
+                (monthly_limit, existing_budget[0])
             )
-            VALUES(?, ?, ?, ?, ?)
-            """, (account_id, category_id, monthly_limit, month, year))
 
-        cursor.execute("""
-            SELECT
-                b.*,
-                a.account_name,
-                c.category_name
+        else:
+            cursor.execute(
+                """
+                INSERT INTO tracker.Budgets (
+                    account_id, 
+                    category_id, 
+                    monthly_limit,
+                    budget_month, 
+                    budget_year
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (account_id, category_id, monthly_limit, month, year)
+            )
+
+        cursor.execute(
+            """
+            SELECT b.*, 
+                a.account_name, 
+                c.category_name 
             FROM tracker.Budgets b
-            JOIN tracker.Accounts a
+            INNER JOIN tracker.Accounts a
                 ON b.account_id = a.account_id
-            JOIN tracker.Categories c
+            INNER JOIN tracker.Categories c
                 ON b.category_id = c.category_id
-            WHERE b.account_id = ?
-                AND b.category_id = ?
-                AND b.budget_month = ?
+            WHERE b.account_id = ? 
+                AND b.category_id = ? 
+                AND b.budget_month = ? 
                 AND b.budget_year = ?
-        """, (account_id, category_id, month, year))
-
-        row = cursor.fetchone()
-
-        if row is None:
-            connection.rollback()
-            return None
+            """,
+            (account_id, category_id, month, year)
+        )
 
         columns = [column[0] for column in cursor.description]
-
-        budget = dict(zip(columns, row))
+        row = cursor.fetchone()
 
         connection.commit()
 
-        return budget
+        return dict(zip(columns, row)) if row is not None else None
 
-    except Exception as error:
+    except Exception:
         connection.rollback()
-        raise error
-
-    finally:
-        cursor.close()
+        raise
 
 def get_budgets(connection, account_id: int = None, month: int = None, year: int = None) -> list[dict]:
     """
@@ -87,35 +99,34 @@ def get_budgets(connection, account_id: int = None, month: int = None, year: int
     cursor = connection.cursor()
 
     query = """
-    SELECT
-        b.budget_id,
-        a.account_name,
-        c.category_name,
-        b.monthly_limit,
-        b.budget_month,
-        b.budget_year
-    FROM tracker.Budgets AS b
-    INNER JOIN tracker.Accounts AS a
-        ON b.account_id = a.account_id
-    INNER JOIN tracker.Categories AS c
-        ON b.category_id = c.category_id
+        SELECT 
+            b.budget_id, 
+            a.account_name, 
+            c.category_name, 
+            b.monthly_limit, 
+            b.budget_month, 
+            b.budget_year
+        FROM tracker.Budgets b
+        INNER JOIN tracker.Accounts a
+            ON b.account_id = a.account_id
+        INNER JOIN tracker.Categories c
+            ON b.category_id = c.category_id
     """
 
-    # Conditional query building method I found on the internet
     conditions = []
-    params = []
+    parameters = []
 
     if account_id is not None:
-        conditions.append(f"b.account_id = ?")
-        params.append(account_id)
+        conditions.append("b.account_id = ?")
+        parameters.append(account_id)
 
     if month is not None:
         conditions.append("b.budget_month = ?")
-        params.append(month)
+        parameters.append(month)
 
     if year is not None:
         conditions.append("b.budget_year = ?")
-        params.append(year)
+        parameters.append(year) 
 
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
@@ -123,7 +134,7 @@ def get_budgets(connection, account_id: int = None, month: int = None, year: int
     query += " ORDER BY b.budget_month, b.budget_year"
 
     try:
-        cursor.execute(query, params)
+        cursor.execute(query, parameters)
 
         columns = [column[0] for column in cursor.description]
         rows = cursor.fetchall()
@@ -144,6 +155,15 @@ def get_budget_remaining(connection, budget_id) -> dict | None:
     Returns a dictionary, or None if no budget exists.
 
     Basically tally all transactions for this month for this category for a net amount.
+
+    Should return:
+    budget id
+    monthly limit
+    COALESCE transaction amount AS amount spent
+    monthly limit - COALESCE transaction amount AS amount spent
+
+    Group by:
+    budget id, monthly limit
     """
 
     cursor = connection.cursor()

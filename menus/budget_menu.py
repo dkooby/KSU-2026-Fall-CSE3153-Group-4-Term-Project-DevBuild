@@ -5,6 +5,7 @@ from rich.table import Table
 
 from services import budget_service
 from menus import menu_utils
+from decimal import Decimal
 
 console = Console()
 
@@ -120,7 +121,14 @@ def set_budget_prompt(connection):
         return
 
     try:
-        budget = budget_service.set_budget(connection, account_id, category_id, monthly_limit, month, year)
+        budget = budget_service.set_budget(
+            connection, 
+            account_id, 
+            category_id, 
+            Decimal(monthly_limit), 
+            int(month), 
+            int(year)
+            )
 
         console.print(
             Panel(
@@ -235,6 +243,11 @@ def calculate_remaining_budget_prompt(connection):
 
     if not budgets:
         console.print("\n[yellow]No budgets found for this account...[/yellow]")
+        questionary.text(
+            "\nPress Enter to return to the budgets menu.", 
+            qmark=""
+        ).ask()
+        return
 
     choices = [
         questionary.Choice(
@@ -256,6 +269,9 @@ def calculate_remaining_budget_prompt(connection):
         qmark="",
         pointer="❯"
     ).ask()
+
+    if selected_budget is None:
+        return
 
     try:
         remaining_budget = budget_service.get_budget_remaining(connection, selected_budget)

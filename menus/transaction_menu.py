@@ -7,8 +7,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from menus import menu_utils
-from services import transaction_service
-from services import services_utils
+from services import transaction_service, services_utils
 
 console = Console()
 

@@ -2,8 +2,7 @@ import questionary
 from rich.console import Console
 from rich.panel import Panel
 
-from services import account_service
-from services import services_utils
+from services import account_service, services_utils
 
 console = Console()
 

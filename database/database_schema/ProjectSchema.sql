@@ -95,11 +95,11 @@ CREATE TABLE tracker.Transactions
 
     CONSTRAINT PK_Transactions PRIMARY KEY (transaction_id),
     CONSTRAINT FK_Transactions_Accounts
-        FOREIGN KEY (account_id) REFERENCES tracker.Accounts (account_id),
+        FOREIGN KEY (account_id) REFERENCES tracker.Accounts (account_id) ON DELETE CASCADE,
     CONSTRAINT FK_Transactions_Categories
-        FOREIGN KEY (category_id) REFERENCES tracker.Categories (category_id),
+        FOREIGN KEY (category_id) REFERENCES tracker.Categories (category_id) ON DELETE CASCADE,
     CONSTRAINT FK_Transactions_Merchants
-        FOREIGN KEY (merchant_id) REFERENCES tracker.Merchants (merchant_id),
+        FOREIGN KEY (merchant_id) REFERENCES tracker.Merchants (merchant_id) ON DELETE CASCADE,
     CONSTRAINT CK_Transactions_Amount CHECK (transaction_amount > 0)
 );
 GO
@@ -116,9 +116,9 @@ CREATE TABLE tracker.Budgets
 
     CONSTRAINT PK_Budgets PRIMARY KEY (budget_id),
     CONSTRAINT FK_Budgets_Accounts
-        FOREIGN KEY (account_id) REFERENCES tracker.Accounts (account_id),
+        FOREIGN KEY (account_id) REFERENCES tracker.Accounts (account_id) ON DELETE CASCADE,
     CONSTRAINT FK_Budgets_Categories
-        FOREIGN KEY (category_id) REFERENCES tracker.Categories (category_id),
+        FOREIGN KEY (category_id) REFERENCES tracker.Categories (category_id) ON DELETE CASCADE,
     CONSTRAINT CK_Budgets_MonthlyLimit CHECK (monthly_limit > 0),
     CONSTRAINT CK_Budgets_Month CHECK (budget_month BETWEEN 1 AND 12),
     CONSTRAINT CK_Budgets_Year CHECK (budget_year >= 1),
